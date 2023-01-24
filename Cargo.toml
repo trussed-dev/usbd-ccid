@@ -6,6 +6,8 @@ edition = "2021"
 license = "Apache-2.0 OR MIT"
 documentation = "https://docs.rs/usbd-ccid"
 repository = "https://github.com/trussed-dev/usbd-ccid"
+description = "usb-device driver for CCID"
+categories = ["embedded", "no-std"]
 
 [dependencies]
 delog = "0.1.0"
