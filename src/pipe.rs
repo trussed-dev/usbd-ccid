@@ -30,7 +30,7 @@ pub enum State {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[allow(dead_code)]
+#[allow(dead_code, clippy::enum_variant_names)]
 enum Error {
     CmdAborted = 0xff,
     IccMute = 0xfe,
@@ -74,7 +74,7 @@ where
         card_issuers_data: Option<&[u8]>,
     ) -> Self {
 
-        assert!(MAX_MSG_LENGTH >= PACKET_SIZE);
+        // assert!(MAX_MSG_LENGTH >= PACKET_SIZE);
 
         Self {
             write,
@@ -375,7 +375,7 @@ where
         if self.outbox.is_some() { panic!(); }
 
         // if let Some(message) = self.interchange.response() {
-            let message: &mut Vec<u8, N> = unsafe { (&mut *self.interchange.interchange.get()).rp_mut() };
+            let message: &mut Vec<u8, N> = unsafe { (*self.interchange.interchange.get()).rp_mut() };
 
             let chunk_size = core::cmp::min(PACKET_SIZE - 10, message.len() - self.sent);
             let chunk = &message[self.sent..][..chunk_size];
@@ -466,7 +466,7 @@ where
 
 
     fn send_packet_assuming_possible(&mut self, packet: RawPacket) {
-        if !self.outbox.is_none() {
+        if self.outbox.is_some() {
             // Previous transaction will fail, but we'll be ready for new transactions.
             self.state = State::Idle;
             info!("overwriting last session..");

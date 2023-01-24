@@ -21,6 +21,7 @@ pub enum Error {
     UnknownCommand(u8),
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum Message {
     Command(Command),
     Response(Response),
@@ -32,11 +33,11 @@ pub trait Packet: core::ops::Deref<Target = ExtPacket> {
     fn slot(&self) -> u8 {
         // we have only one slot
         assert!(self[5] == 0);
-        *&self[5]
+        self[5]
     }
 
     #[inline]
-    fn seq(&self) -> u8 { *&self[6] }
+    fn seq(&self) -> u8 { self[6] }
 
 }
 
@@ -118,23 +119,23 @@ impl core::fmt::Debug for DataBlock<'_> {
 //     fn seq(&self) -> u8 { self.seq }
 // }
 
-impl Into<RawPacket> for DataBlock<'_> {
-    fn into(self) -> RawPacket {
+impl From<DataBlock<'_>> for RawPacket {
+    fn from(block: DataBlock<'_>) -> RawPacket {
         let mut packet = RawPacket::new();
-        let len = self.data.len();
+        let len = block.data.len();
         packet.resize_default(10 + len).ok();
         packet[0] = 0x80;
         packet[1..][..4].copy_from_slice(&len.to_le_bytes());
         packet[5] = 0;
-        packet[6] = self.seq;
+        packet[6] = block.seq;
 
         // status
         packet[7] = 0;
         // error
         packet[8] = 0;
         // chain parameter
-        packet[9] = self.chain as u8;
-        packet[10..][..len].copy_from_slice(self.data);
+        packet[9] = block.chain as u8;
+        packet[10..][..len].copy_from_slice(block.data);
 
         packet
     }
@@ -313,12 +314,9 @@ pub enum Chain {
 
 impl Chain {
     pub fn transfer_ongoing(&self) -> bool {
-        match self {
-            Chain::BeginsAndEnds |
+        matches!(self, Chain::BeginsAndEnds |
             Chain::Ends |
-            Chain::ExpectingMore => true,
-            _ => false,
-        }
+            Chain::ExpectingMore)
     }
 }
 
@@ -339,28 +337,25 @@ impl core::fmt::Debug for Command {
             .field("seq", &self.seq())
         ;
 
-        match self {
-            Command::XfrBlock(block) => {
-                let l = core::cmp::min(self.len(), 8);
-                let escaped_bytes: heapless::Vec<u8, 64> =
-                    block.data().iter().take(l)
-                        .flat_map(|byte| core::ascii::escape_default(*byte))
-                        .collect();
-                let data_as_str = &core::str::from_utf8(&escaped_bytes).unwrap();
+        if let Command::XfrBlock(block) = self {
+            let l = core::cmp::min(self.len(), 8);
+            let escaped_bytes: heapless::Vec<u8, 64> =
+                block.data().iter().take(l)
+                    .flat_map(|byte| core::ascii::escape_default(*byte))
+                    .collect();
+            let data_as_str = &core::str::from_utf8(&escaped_bytes).unwrap();
 
-                debug_struct
-                    .field("chain", &block.chain())
-                    .field("len", &block.data().len())
-                ;
+            debug_struct
+                .field("chain", &block.chain())
+                .field("len", &block.data().len())
+            ;
 
-                if l < self.len() {
-                    debug_struct.field("data[..8]", &format_args!("b'{}'", data_as_str))
-                } else {
-                    debug_struct.field("data", &format_args!("b'{}'", data_as_str))
-                }
-                ;
+            if l < self.len() {
+                debug_struct.field("data[..8]", &format_args!("b'{}'", data_as_str))
+            } else {
+                debug_struct.field("data", &format_args!("b'{}'", data_as_str))
             }
-            _ => {}
+            ;
         }
 
         // let mut debug_struct = match self.msg_type() {

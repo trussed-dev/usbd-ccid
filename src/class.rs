@@ -111,7 +111,7 @@ where
 
     fn get_string(&self, index: StringIndex, _lang_id: u16) -> Option<&str> {
         (self.string_index == index)
-            .then(|| FUNCTIONAL_INTERFACE_STRING)
+            .then_some(FUNCTIONAL_INTERFACE_STRING)
     }
 
     #[inline(never)]
