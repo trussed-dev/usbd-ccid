@@ -224,7 +224,7 @@ macro_rules! command_message {
             fn try_from(packet: ExtPacket)
                 -> core::result::Result<Self, Self::Error>
             {
-                if packet.len() <CCID_HEADER_LEN {
+                if packet.len() < CCID_HEADER_LEN {
                     return Err(Error::ShortPacket);
                 }
                 if packet[5] != 0 {
