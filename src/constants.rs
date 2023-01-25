@@ -11,11 +11,13 @@ pub const SUBCLASS_NONE: u8 = 0x0;
 
 #[repr(u8)]
 pub enum TransferMode {
-    // bulk transfers, optional interrupt IN
+    /// bulk transfers, optional interrupt IN
     Bulk = 0,
-    // control transfers, no interrupt IN
+    /// control transfers, no interrupt IN
+    #[allow(unused)]
     ControlA = 1,
-    // control transfers, optional interrupt IN
+    /// control transfers, optional interrupt IN
+    #[allow(unused)]
     ControlB = 2,
 }
 

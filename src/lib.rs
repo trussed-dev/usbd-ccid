@@ -13,8 +13,8 @@ extern crate delog;
 generate_macros!();
 
 pub mod class;
-pub mod constants;
-pub mod pipe;
+mod constants;
+mod pipe;
 pub mod types;
 
 // pub mod piv;
