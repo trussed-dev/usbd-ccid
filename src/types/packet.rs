@@ -272,27 +272,6 @@ command_message!(
 impl PacketWithData for XfrBlock {}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum PowerSelection {
-    Automatic,
-    V5,
-    V3_3,
-    V1_8,
-}
-
-impl PowerOn {
-    #[inline(always)]
-    pub fn power_select(&self) -> PowerSelection {
-        match &self[7] {
-            0 => PowerSelection::Automatic,
-            1 => PowerSelection::V5,
-            2 => PowerSelection::V3_3,
-            3 => PowerSelection::V1_8,
-            _ => panic!("invalid power select parameter"),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Chain {
     BeginsAndEnds = 0,
