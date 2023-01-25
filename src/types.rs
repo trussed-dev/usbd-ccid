@@ -1,12 +1,12 @@
 use embedded_time::duration::Milliseconds;
 
 // pub mod apdu;
-pub mod packet;
+pub(crate) mod packet;
 
 // pub type MessageBuffer = apdu_dispatch::interchanges::Data;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ClassRequest {
+pub(crate) enum ClassRequest {
     Abort = 1,
     GetClockFrequencies = 2,
     GetDataRates = 3,
