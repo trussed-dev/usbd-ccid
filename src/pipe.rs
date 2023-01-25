@@ -365,8 +365,9 @@ where
             panic!("Full outbox");
         }
 
-        // if let Some(message) = self.interchange.response() {
-        let message: &mut Vec<u8, N> = unsafe { (*self.interchange.interchange.get()).rp_mut() };
+        let Some(message) = self.interchange.response()  else {
+            panic!("No response while priming outbox");
+        };
 
         let chunk_size = core::cmp::min(PACKET_SIZE - 10, message.len() - self.sent);
         let chunk = &message[self.sent..][..chunk_size];
@@ -399,7 +400,6 @@ where
 
         // fast-lane response attempt
         self.maybe_send_packet();
-        // }
     }
 
     fn send_empty_datablock(&mut self, chain: Chain) {
