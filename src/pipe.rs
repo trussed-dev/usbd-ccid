@@ -12,6 +12,9 @@ use crate::{
 
 use usb_device::class_prelude::*;
 
+// Const assertion
+const _: [(); 0 - !{ MAX_MSG_LENGTH >= PACKET_SIZE } as usize] = [];
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum State {
     Idle,
@@ -65,8 +68,6 @@ where
         request_pipe: Requester<I>,
         card_issuers_data: Option<&[u8]>,
     ) -> Self {
-        // assert!(MAX_MSG_LENGTH >= PACKET_SIZE);
-
         Self {
             write,
             seq: 0,
@@ -144,18 +145,18 @@ where
         // when certificates are transmitted, because PIV somehow uses short APDUs
         // only (can we fix this), so 255B is the maximum)
         if !self.receiving_long {
-            if packet.len() < 10 {
+            if packet.len() < CCID_HEADER_LEN {
                 panic!("unexpected short packet");
             }
             self.ext_packet.clear();
             // TODO check
             self.ext_packet.extend_from_slice(&packet).unwrap();
 
-            let pl = packet.packet_len();
-            if pl > 54 {
+            let pl = packet.data_len();
+            if pl > PACKET_SIZE - CCID_HEADER_LEN {
                 self.receiving_long = true;
                 self.in_chain = 1;
-                self.long_packet_missing = pl - 54;
+                self.long_packet_missing = pl - PACKET_SIZE - CCID_HEADER_LEN;
                 self.packet_len = pl;
                 return;
             } else {
@@ -303,7 +304,7 @@ where
         if self.state == State::Processing {
             // Need to send a wait extension request.
             let mut packet = RawPacket::new();
-            packet.resize_default(10).ok();
+            packet.resize_default(CCID_HEADER_LEN).ok();
             packet[0] = 0x80;
             packet[6] = self.seq;
 
@@ -322,7 +323,7 @@ where
     }
 
     /// Turns false on read.  Intended for checking to see if a wait extension request needs to be started.
-    pub fn did_started_processing(&mut self) -> bool {
+    pub fn did_start_processing(&mut self) -> bool {
         if self.started_processing {
             self.started_processing = false;
             true
@@ -342,7 +343,7 @@ where
 
     #[inline(never)]
     pub fn poll_app(&mut self) {
-        if let State::Processing = self.state {
+        if State::Processing == self.state {
             // info!("processing, checking for response, interchange state {:?}",
             //           self.interchange.state()).ok();
 
@@ -361,13 +362,14 @@ where
         }
 
         if self.outbox.is_some() {
-            panic!();
+            panic!("Full outbox");
         }
 
-        // if let Some(message) = self.interchange.response() {
-        let message: &mut Vec<u8, N> = unsafe { (*self.interchange.interchange.get()).rp_mut() };
+        let Some(message) = self.interchange.response()  else {
+            panic!("No response while priming outbox");
+        };
 
-        let chunk_size = core::cmp::min(PACKET_SIZE - 10, message.len() - self.sent);
+        let chunk_size = core::cmp::min(PACKET_SIZE - CCID_HEADER_LEN, message.len() - self.sent);
         let chunk = &message[self.sent..][..chunk_size];
         self.sent += chunk_size;
         let more = self.sent < message.len();
@@ -398,7 +400,6 @@ where
 
         // fast-lane response attempt
         self.maybe_send_packet();
-        // }
     }
 
     fn send_empty_datablock(&mut self, chain: Chain) {
@@ -408,7 +409,7 @@ where
 
     fn send_slot_status_ok(&mut self) {
         let mut packet = RawPacket::new();
-        packet.resize_default(10).ok();
+        packet.resize_default(CCID_HEADER_LEN).ok();
         packet[0] = 0x81;
         packet[6] = self.seq;
         self.send_packet_assuming_possible(packet);
@@ -416,7 +417,7 @@ where
 
     fn send_slot_status_error(&mut self, error: Error) {
         let mut packet = RawPacket::new();
-        packet.resize_default(10).ok();
+        packet.resize_default(CCID_HEADER_LEN).ok();
         packet[0] = 0x6c;
         packet[6] = self.seq;
         packet[7] = 1 << 6;

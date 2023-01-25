@@ -1,4 +1,4 @@
-use core::convert::TryInto;
+use core::convert::{TryFrom, TryInto};
 
 use crate::constants::*;
 
@@ -6,11 +6,11 @@ pub type RawPacket = heapless::Vec<u8, PACKET_SIZE>;
 pub type ExtPacket = heapless::Vec<u8, MAX_MSG_LENGTH>;
 
 pub trait RawPacketExt {
-    fn packet_len(&self) -> usize;
+    fn data_len(&self) -> usize;
 }
 
 impl RawPacketExt for RawPacket {
-    fn packet_len(&self) -> usize {
+    fn data_len(&self) -> usize {
         u32::from_le_bytes(self[1..5].try_into().unwrap()) as usize
     }
 }
@@ -45,9 +45,9 @@ pub trait PacketWithData: Packet {
     fn data(&self) -> &[u8] {
         // let len = u32::from_le_bytes(self[1..5].try_into().unwrap()) as usize;
         let declared_len = u32::from_le_bytes(self[1..5].try_into().unwrap()) as usize;
-        let len = core::cmp::min(MAX_MSG_LENGTH - 10, declared_len);
+        let len = core::cmp::min(MAX_MSG_LENGTH - CCID_HEADER_LEN, declared_len);
         // hprintln!("delcared = {}, len = {}", declared_len, len).ok();
-        &self[10..][..len]
+        &self[CCID_HEADER_LEN..][..len]
     }
 }
 
@@ -76,7 +76,7 @@ pub struct DataBlock<'a> {
 
 impl<'a> DataBlock<'a> {
     pub fn new(seq: u8, chain: Chain, data: &'a [u8]) -> Self {
-        assert!(data.len() + 10 <= PACKET_SIZE);
+        assert!(data.len() + CCID_HEADER_LEN <= PACKET_SIZE);
         Self { seq, chain, data }
     }
 }
@@ -117,9 +117,13 @@ impl From<DataBlock<'_>> for RawPacket {
     fn from(block: DataBlock<'_>) -> RawPacket {
         let mut packet = RawPacket::new();
         let len = block.data.len();
-        packet.resize_default(10 + len).ok();
+        packet.resize_default(CCID_HEADER_LEN + len).ok();
         packet[0] = 0x80;
-        packet[1..][..4].copy_from_slice(&len.to_le_bytes());
+        packet[1..][..4].copy_from_slice(
+            &u32::try_from(len)
+                .expect("Packets should not be more than 4GiB")
+                .to_le_bytes(),
+        );
         packet[5] = 0;
         packet[6] = block.seq;
 
@@ -129,7 +133,7 @@ impl From<DataBlock<'_>> for RawPacket {
         packet[8] = 0;
         // chain parameter
         packet[9] = block.chain as u8;
-        packet[10..][..len].copy_from_slice(block.data);
+        packet[CCID_HEADER_LEN..][..len].copy_from_slice(block.data);
 
         packet
     }
@@ -220,7 +224,7 @@ macro_rules! command_message {
             fn try_from(packet: ExtPacket)
                 -> core::result::Result<Self, Self::Error>
             {
-                if packet.len() < 10 {
+                if packet.len() <CCID_HEADER_LEN {
                     return Err(Error::ShortPacket);
                 }
                 if packet[5] != 0 {

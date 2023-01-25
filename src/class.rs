@@ -66,7 +66,7 @@ where
     }
 
     pub fn did_start_processing(&mut self) -> Status {
-        if self.pipe.did_started_processing() {
+        if self.pipe.did_start_processing() {
             // We should send a wait extension later
             Status::ReceivedData(1_000.milliseconds())
         } else {
@@ -137,15 +137,19 @@ where
             packet.resize_default(packet.capacity()).unwrap();
             let result = self.read.read(&mut packet);
             result.map(|count| {
-                packet.resize_default(count).unwrap();
+                assert!(count <= packet.len());
+                packet.truncate(count);
                 packet
             })
         };
 
         // should we return an error message
         // if the raw packet is invalid?
-        if let Ok(packet) = maybe_packet {
-            self.pipe.handle_packet(packet);
+        match maybe_packet {
+            Ok(packet) => self.pipe.handle_packet(packet),
+            Err(_err) => {
+                error!("Failed to read packet: {:?}", _err);
+            }
         }
     }
 
