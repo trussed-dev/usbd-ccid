@@ -362,7 +362,7 @@ where
         }
 
         if self.outbox.is_some() {
-            panic!();
+            panic!("Full outbox");
         }
 
         // if let Some(message) = self.interchange.response() {
