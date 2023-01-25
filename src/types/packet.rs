@@ -20,12 +20,6 @@ pub enum Error {
     UnknownCommand(u8),
 }
 
-#[allow(clippy::large_enum_variant)]
-pub enum Message {
-    Command(Command),
-    Response(Response),
-}
-
 pub trait Packet: core::ops::Deref<Target = ExtPacket> {
     #[inline]
     fn slot(&self) -> u8 {
@@ -151,16 +145,15 @@ pub enum CommandType {
     GetParameters = 0x6c,
     XfrBlock = 0x6f,
     Abort = 0x72,
-
     // unsupported
-    ResetParameters = 0x6d,
-    SetParameters = 0x61,
-    Escape = 0x6b, //  for vendor commands
-    IccClock = 0x7e,
-    T0Apdu = 0x6a,
-    Secure = 0x69,
-    Mechanical = 0x71,
-    SetDataRateAndClockFrequency = 0x73,
+    // ResetParameters = 0x6d,
+    // SetParameters = 0x61,
+    // Escape = 0x6b, //  for vendor commands
+    // IccClock = 0x7e,
+    // T0Apdu = 0x6a,
+    // Secure = 0x69,
+    // Mechanical = 0x71,
+    // SetDataRateAndClockFrequency = 0x73,
 }
 
 macro_rules! command_message {
@@ -316,11 +309,6 @@ impl Chain {
             Chain::BeginsAndEnds | Chain::Ends | Chain::ExpectingMore
         )
     }
-}
-
-pub enum Response {
-    // DataBlock(DataBlock),
-    // SlotStatus(SlotStatus),
 }
 
 impl core::fmt::Debug for Command {

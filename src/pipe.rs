@@ -120,12 +120,6 @@ where
 
         atr
     }
-
-    pub fn busy(&self) -> bool {
-        // need more states, but if we're waiting
-        // to send, we can't accept new packets
-        self.outbox.is_some()
-    }
 }
 
 impl<Bus, I, const N: usize> Pipe<Bus, I, N>
