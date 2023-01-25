@@ -45,7 +45,6 @@ pub const MAX_IFSD: [u8; 4] = [0xfe, 0x00, 0x00, 0x00];
 pub const MAX_MSG_LENGTH: usize = 3072;
 pub const MAX_MSG_LENGTH_LE: [u8; 4] = (MAX_MSG_LENGTH as u32).to_le_bytes();
 
-pub const NUM_SLOTS: u8 = 1;
 pub const MAX_BUSY_SLOTS: u8 = 1;
 // bPinSupport (0x0 = none, 0x01 = verification, 0x02 = modification)
 pub const PIN_SUPPORT: u8 = 0;
