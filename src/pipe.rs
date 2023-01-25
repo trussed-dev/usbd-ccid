@@ -145,7 +145,7 @@ where
         // when certificates are transmitted, because PIV somehow uses short APDUs
         // only (can we fix this), so 255B is the maximum)
         if !self.receiving_long {
-            if packet.len() < 10 {
+            if packet.len() < CCID_HEADER_LEN {
                 panic!("unexpected short packet");
             }
             self.ext_packet.clear();
@@ -304,7 +304,7 @@ where
         if self.state == State::Processing {
             // Need to send a wait extension request.
             let mut packet = RawPacket::new();
-            packet.resize_default(10).ok();
+            packet.resize_default(CCID_HEADER_LEN).ok();
             packet[0] = 0x80;
             packet[6] = self.seq;
 
@@ -369,7 +369,7 @@ where
             panic!("No response while priming outbox");
         };
 
-        let chunk_size = core::cmp::min(PACKET_SIZE - 10, message.len() - self.sent);
+        let chunk_size = core::cmp::min(PACKET_SIZE - CCID_HEADER_LEN, message.len() - self.sent);
         let chunk = &message[self.sent..][..chunk_size];
         self.sent += chunk_size;
         let more = self.sent < message.len();
@@ -409,7 +409,7 @@ where
 
     fn send_slot_status_ok(&mut self) {
         let mut packet = RawPacket::new();
-        packet.resize_default(10).ok();
+        packet.resize_default(CCID_HEADER_LEN).ok();
         packet[0] = 0x81;
         packet[6] = self.seq;
         self.send_packet_assuming_possible(packet);
@@ -417,7 +417,7 @@ where
 
     fn send_slot_status_error(&mut self, error: Error) {
         let mut packet = RawPacket::new();
-        packet.resize_default(10).ok();
+        packet.resize_default(CCID_HEADER_LEN).ok();
         packet[0] = 0x6c;
         packet[6] = self.seq;
         packet[7] = 1 << 6;
