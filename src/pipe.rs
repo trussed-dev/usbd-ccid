@@ -152,7 +152,7 @@ where
             // TODO check
             self.ext_packet.extend_from_slice(&packet).unwrap();
 
-            let pl = packet.packet_len();
+            let pl = packet.data_len();
             if pl > PACKET_SIZE - CCID_HEADER_LEN {
                 self.receiving_long = true;
                 self.in_chain = 1;
