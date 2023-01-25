@@ -12,11 +12,12 @@
 extern crate delog;
 generate_macros!();
 
-pub mod class;
+mod class;
 mod constants;
 mod pipe;
-pub mod types;
+mod types;
 
 // pub mod piv;
 
 pub use class::Ccid;
+pub use types::Status;
