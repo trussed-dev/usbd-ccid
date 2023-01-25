@@ -343,7 +343,7 @@ where
 
     #[inline(never)]
     pub fn poll_app(&mut self) {
-        if let State::Processing = self.state {
+        if State::Processing == self.state {
             // info!("processing, checking for response, interchange state {:?}",
             //           self.interchange.state()).ok();
 
