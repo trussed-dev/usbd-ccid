@@ -12,6 +12,9 @@ use crate::{
 
 use usb_device::class_prelude::*;
 
+// Const assertion
+const _: [(); 0 - !{ MAX_MSG_LENGTH >= PACKET_SIZE } as usize] = [];
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum State {
     Idle,
@@ -65,8 +68,6 @@ where
         request_pipe: Requester<I>,
         card_issuers_data: Option<&[u8]>,
     ) -> Self {
-        // assert!(MAX_MSG_LENGTH >= PACKET_SIZE);
-
         Self {
             write,
             seq: 0,
