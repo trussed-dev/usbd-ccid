@@ -150,7 +150,7 @@ where
             if pl > PACKET_SIZE - CCID_HEADER_LEN {
                 self.receiving_long = true;
                 self.in_chain = 1;
-                self.long_packet_missing = pl - PACKET_SIZE - CCID_HEADER_LEN;
+                self.long_packet_missing = pl - (PACKET_SIZE - CCID_HEADER_LEN);
                 self.packet_len = pl;
                 return;
             } else {
