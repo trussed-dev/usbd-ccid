@@ -12,8 +12,7 @@ use crate::{
 
 use usb_device::class_prelude::*;
 
-// Const assertion
-const _: [(); 0 - !{ MAX_MSG_LENGTH >= PACKET_SIZE } as usize] = [];
+const _: () = assert!(MAX_MSG_LENGTH >= PACKET_SIZE);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum State {
