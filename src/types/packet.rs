@@ -93,7 +93,7 @@ impl core::fmt::Debug for DataBlock<'_> {
         debug_struct
             .field("chain", &self.chain)
             .field("len", &self.data.len())
-            .field("data", &format_args!("b'{}'", data_as_str))
+            .field("data", &format_args!("b'{data_as_str}'"))
             .finish()
     }
 }
@@ -315,9 +315,9 @@ impl core::fmt::Debug for Command {
                 .field("len", &block.data().len());
 
             if l < self.len() {
-                debug_struct.field("data[..8]", &format_args!("b'{}'", data_as_str))
+                debug_struct.field("data[..8]", &format_args!("b'{data_as_str}'"))
             } else {
-                debug_struct.field("data", &format_args!("b'{}'", data_as_str))
+                debug_struct.field("data", &format_args!("b'{data_as_str}'"))
             };
         }
 
