@@ -12,6 +12,7 @@ use crate::{
 
 use usb_device::class_prelude::*;
 
+#[allow(clippy::assertions_on_constants)]
 const _: () = assert!(MAX_MSG_LENGTH >= PACKET_SIZE);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
