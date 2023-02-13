@@ -1,8 +1,7 @@
 use core::convert::TryFrom;
 
+use crate::pipe::Requester;
 use embedded_time::duration::Extensions;
-use heapless::Vec;
-use interchange::{Interchange, Requester};
 
 use crate::{
     constants::*,
@@ -13,22 +12,20 @@ use crate::{
 use usb_device::class_prelude::*;
 type Result<T> = core::result::Result<T, UsbError>;
 
-pub struct Ccid<'bus, Bus, I, const N: usize>
+pub struct Ccid<'bus, 'pipe, Bus, const N: usize>
 where
     Bus: 'static + UsbBus,
-    I: 'static + Interchange<REQUEST = Vec<u8, N>, RESPONSE = Vec<u8, N>>,
 {
     interface_number: InterfaceNumber,
     string_index: StringIndex,
     read: EndpointOut<'bus, Bus>,
     // interrupt: EndpointIn<'static, Bus>,
-    pipe: Pipe<'bus, Bus, I, N>,
+    pipe: Pipe<'bus, 'pipe, Bus, N>,
 }
 
-impl<'bus, Bus, I, const N: usize> Ccid<'bus, Bus, I, N>
+impl<'bus, 'pipe, Bus, const N: usize> Ccid<'bus, 'pipe, Bus, N>
 where
     Bus: 'static + UsbBus,
-    I: 'static + Interchange<REQUEST = Vec<u8, N>, RESPONSE = Vec<u8, N>>,
 {
     /// Class constructor.
     ///
@@ -37,7 +34,7 @@ where
     /// ASCII-encoding vendor or model information.
     pub fn new(
         allocator: &'bus UsbBusAllocator<Bus>,
-        request_pipe: Requester<I>,
+        request_pipe: Requester<'pipe, N>,
         card_issuers_data: Option<&[u8]>,
     ) -> Self {
         let read = allocator.bulk(PACKET_SIZE as _);
@@ -84,10 +81,9 @@ where
     }
 }
 
-impl<'bus, Bus, I, const N: usize> UsbClass<Bus> for Ccid<'bus, Bus, I, N>
+impl<'bus, 'pipe, Bus, const N: usize> UsbClass<Bus> for Ccid<'bus, 'pipe, Bus, N>
 where
-    Bus: 'static + UsbBus,
-    I: 'static + Interchange<REQUEST = Vec<u8, N>, RESPONSE = Vec<u8, N>>,
+    Bus: UsbBus,
 {
     fn get_configuration_descriptors(&self, writer: &mut DescriptorWriter) -> Result<()> {
         writer.interface_alt(
