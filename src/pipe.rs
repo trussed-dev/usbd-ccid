@@ -1,6 +1,5 @@
 use core::convert::TryFrom;
 use heapless::Vec;
-use interchange::{Interchange, Requester};
 
 use crate::{
     constants::*,
@@ -35,16 +34,18 @@ enum Error {
     CommandNotSupported = 0x00,
 }
 
-pub struct Pipe<'bus, Bus, I, const N: usize>
+pub(crate) type Requester<'pipe, const N: usize> =
+    interchange::Requester<'pipe, iso7816::Data<N>, iso7816::Data<N>>;
+
+pub struct Pipe<'bus, 'pipe, Bus, const N: usize>
 where
     Bus: 'static + UsbBus,
-    I: 'static + Interchange<REQUEST = Vec<u8, N>, RESPONSE = Vec<u8, N>>,
 {
     pub(crate) write: EndpointIn<'bus, Bus>,
     // pub(crate) rpc: TransportEndpoint<'rpc>,
     seq: u8,
     state: State,
-    interchange: Requester<I>,
+    interchange: Requester<'pipe, N>,
     sent: usize,
     outbox: Option<RawPacket>,
 
@@ -62,14 +63,13 @@ where
     control_abort: Option<u8>,
 }
 
-impl<'bus, Bus, I, const N: usize> Pipe<'bus, Bus, I, N>
+impl<'bus, 'pipe, Bus, const N: usize> Pipe<'bus, 'pipe, Bus, N>
 where
     Bus: 'static + UsbBus,
-    I: 'static + Interchange<REQUEST = Vec<u8, N>, RESPONSE = Vec<u8, N>>,
 {
     pub(crate) fn new(
         write: EndpointIn<'bus, Bus>,
-        request_pipe: Requester<I>,
+        request_pipe: Requester<'pipe, N>,
         card_issuers_data: Option<&[u8]>,
     ) -> Self {
         Self {
@@ -144,13 +144,7 @@ where
 
         atr
     }
-}
 
-impl<'bus, Bus, I, const N: usize> Pipe<'bus, Bus, I, N>
-where
-    Bus: 'static + UsbBus,
-    I: 'static + Interchange<REQUEST = Vec<u8, N>, RESPONSE = Vec<u8, N>>,
-{
     pub fn handle_packet(&mut self, packet: RawPacket) {
         use crate::types::packet::RawPacketExt;
 
@@ -264,7 +258,7 @@ where
         // before the interchange change (adding the request_mut method),
         // one necessary side-effect of this was to set the interchange's
         // enum variant to Request.
-        self.interchange.request(&message).ok();
+        self.interchange.request(message).ok();
         self.interchange.cancel().ok();
 
         self.interchange.take_response();
@@ -284,7 +278,7 @@ where
                     Ok(Chain::BeginsAndEnds) => {
                         info!("begins and ends");
                         self.reset_interchange();
-                        let Some(message) = self.interchange.request_mut() else {
+                        let Ok(message) = self.interchange.request_mut() else {
                             error!("Interchange is busy");
                             self.reset_state();
                             return;
@@ -302,7 +296,7 @@ where
                     Ok(Chain::Begins) => {
                         info!("begins");
                         self.reset_interchange();
-                        let Some(message) = self.interchange.request_mut() else {
+                        let Ok(message) = self.interchange.request_mut() else {
                             error!("Interchange is busy");
                             self.reset_state();
                             return;
@@ -330,7 +324,7 @@ where
             State::Receiving => match command.chain() {
                 Ok(Chain::Continues) => {
                     info!("continues");
-                    let Some(message) = self.interchange.request_mut() else {
+                    let Ok(message) = self.interchange.request_mut() else {
                         error!("Interchange is busy");
                         self.reset_state();
                         return;
@@ -344,7 +338,7 @@ where
                 }
                 Ok(Chain::Ends) => {
                     info!("ends");
-                    let Some(message) = self.interchange.request_mut() else {
+                    let Ok(message) = self.interchange.request_mut() else {
                         error!("Interchange is busy");
                         self.reset_state();
                         return;
@@ -456,7 +450,7 @@ where
             return;
         }
 
-        let Some(message) = self.interchange.response()  else {
+        let Ok(message) = self.interchange.response()  else {
             error!("Got no response while priming outbox");
             self.reset_state();
             return;
