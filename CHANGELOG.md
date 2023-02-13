@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Migrate to Interchange `0.3.0` ([#10][])
+ - This adds a `'pipe` lifetime to the `Ccid` structure
+  Similar behaviour to the before this fix can be emulated using two `const` [`Channels`](https://docs.rs/interchange/latest/interchange/struct.Channel.html)
+  and using a `'static` lifetime
+
 ## [0.2.0] 2023-02-06
 
 ### Add functionality
