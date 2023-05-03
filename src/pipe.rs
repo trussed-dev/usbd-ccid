@@ -1,12 +1,11 @@
-use core::convert::TryFrom;
 use heapless::Vec;
 use interchange::{Interchange, Requester};
 
 use crate::{
     constants::*,
     types::packet::{
-        Chain, ChainedPacket as _, Command as PacketCommand, DataBlock, Error as PacketError,
-        ExtPacket, PacketWithData as _, RawPacket, XfrBlock,
+        Chain, ChainedPacket as _, CommandKind, DataBlock, Error as PacketError, ExtPacket,
+        Packet as _, PacketWithData as _, RawPacket,
     },
 };
 
@@ -179,15 +178,15 @@ where
 
         // info!("{:X?}", &packet).ok();
         // let p = packet.clone();
-        // match PacketCommand::try_from(packet) {
-        match PacketCommand::try_from(self.ext_packet.clone()) {
+        // match CommandKind::try_from(packet) {
+        match self.ext_packet.command_type() {
             Ok(command) => {
-                self.seq = command.seq();
+                self.seq = self.ext_packet.seq();
 
                 // If we receive an ABORT on the control pipe, we reject all further commands until
                 // we receive a matching ABORT on the bulk endpoint too.
                 if let Some(control_abort) = self.control_abort {
-                    if matches!(command, PacketCommand::Abort(_)) && control_abort == self.seq {
+                    if command == CommandKind::Abort && control_abort == self.seq {
                         self.abort();
                     } else {
                         self.send_slot_status_error(Error::CmdAborted);
@@ -198,17 +197,17 @@ where
 
                 // happy path
                 match command {
-                    PacketCommand::PowerOn(_command) => self.send_atr(),
+                    CommandKind::PowerOn => self.send_atr(),
 
-                    PacketCommand::PowerOff(_command) => self.send_slot_status_ok(),
+                    CommandKind::PowerOff => self.send_slot_status_ok(),
 
-                    PacketCommand::GetSlotStatus(_command) => self.send_slot_status_ok(),
+                    CommandKind::GetSlotStatus => self.send_slot_status_ok(),
 
-                    PacketCommand::XfrBlock(command) => self.handle_transfer(command),
+                    CommandKind::XfrBlock => self.handle_transfer(),
 
-                    PacketCommand::Abort(_command) => self.bulk_abort = Some(self.seq),
+                    CommandKind::Abort => self.bulk_abort = Some(self.seq),
 
-                    PacketCommand::GetParameters(_command) => self.send_parameters(),
+                    CommandKind::GetParameters => self.send_parameters(),
                 }
             }
 
@@ -236,7 +235,7 @@ where
         self.interchange.cancel().ok();
     }
 
-    fn handle_transfer(&mut self, command: XfrBlock) {
+    fn handle_transfer(&mut self) {
         // state: Idle, Receiving, Processing, Sending,
         //
         // conts: BeginsAndEnds, Begins, Ends, Continues, ExpectDataBlock,
@@ -246,13 +245,13 @@ where
         match self.state {
             State::Idle => {
                 // invariant: BUFFER_SIZE >= PACKET_SIZE
-                match command.chain() {
+                match self.ext_packet.chain() {
                     Chain::BeginsAndEnds => {
                         info!("begins and ends");
                         self.reset_interchange();
                         let message = self.interchange.request_mut().unwrap();
                         message.clear();
-                        message.extend_from_slice(command.data()).unwrap();
+                        message.extend_from_slice(self.ext_packet.data()).unwrap();
                         self.call_app();
                         self.state = State::Processing;
                         // self.send_empty_datablock();
@@ -262,7 +261,7 @@ where
                         self.reset_interchange();
                         let message = self.interchange.request_mut().unwrap();
                         message.clear();
-                        message.extend_from_slice(command.data()).unwrap();
+                        message.extend_from_slice(self.ext_packet.data()).unwrap();
                         self.state = State::Receiving;
                         self.send_empty_datablock(Chain::ExpectingMore);
                     }
@@ -270,19 +269,19 @@ where
                 }
             }
 
-            State::Receiving => match command.chain() {
+            State::Receiving => match self.ext_packet.chain() {
                 Chain::Continues => {
                     info!("continues");
                     let message = self.interchange.request_mut().unwrap();
-                    assert!(command.data().len() + message.len() <= MAX_MSG_LENGTH);
-                    message.extend_from_slice(command.data()).unwrap();
+                    assert!(self.ext_packet.data().len() + message.len() <= MAX_MSG_LENGTH);
+                    message.extend_from_slice(self.ext_packet.data()).unwrap();
                     self.send_empty_datablock(Chain::ExpectingMore);
                 }
                 Chain::Ends => {
                     info!("ends");
                     let message = self.interchange.request_mut().unwrap();
-                    assert!(command.data().len() + message.len() <= MAX_MSG_LENGTH);
-                    message.extend_from_slice(command.data()).unwrap();
+                    assert!(self.ext_packet.data().len() + message.len() <= MAX_MSG_LENGTH);
+                    message.extend_from_slice(self.ext_packet.data()).unwrap();
                     self.call_app();
                     self.state = State::Processing;
                 }
@@ -294,7 +293,7 @@ where
                 // info!("{:X?}", &command).ok();
                 panic!(
                     "ccid pipe unexpectedly received command while in processing state: {:?}",
-                    &command
+                    &self.ext_packet
                 );
             }
 
@@ -302,7 +301,7 @@ where
                 panic!("unexpectedly in ready-to-send state")
             }
 
-            State::Sending => match command.chain() {
+            State::Sending => match self.ext_packet.chain() {
                 Chain::ExpectingMore => {
                     self.prime_outbox();
                 }

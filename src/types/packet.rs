@@ -1,9 +1,14 @@
-use core::convert::{TryFrom, TryInto};
+use core::{
+    convert::{TryFrom, TryInto},
+    ops::{Deref, DerefMut},
+};
 
 use crate::constants::*;
 
 pub type RawPacket = heapless::Vec<u8, PACKET_SIZE>;
-pub type ExtPacket = heapless::Vec<u8, MAX_MSG_LENGTH>;
+
+#[derive(Default, PartialEq, Eq)]
+pub struct ExtPacket(heapless::Vec<u8, MAX_MSG_LENGTH>);
 
 pub trait RawPacketExt {
     fn data_len(&self) -> usize;
@@ -20,7 +25,7 @@ pub enum Error {
     UnknownCommand(u8),
 }
 
-pub trait Packet: core::ops::Deref<Target = ExtPacket> {
+pub trait Packet: core::ops::Deref<Target = heapless::Vec<u8, MAX_MSG_LENGTH>> {
     #[inline]
     fn slot(&self) -> u8 {
         // we have only one slot
@@ -60,7 +65,22 @@ pub trait ChainedPacket: Packet {
     }
 }
 
-impl ChainedPacket for XfrBlock {}
+impl Deref for ExtPacket {
+    type Target = heapless::Vec<u8, MAX_MSG_LENGTH>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ExtPacket {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Packet for ExtPacket {}
+impl PacketWithData for ExtPacket {}
+impl ChainedPacket for ExtPacket {}
 
 pub struct DataBlock<'a> {
     seq: u8,
@@ -134,8 +154,8 @@ impl From<DataBlock<'_>> for RawPacket {
 }
 
 #[repr(u8)]
-#[derive(Copy, Clone, Debug)]
-pub enum CommandType {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum CommandKind {
     // REQUESTS
 
     // supported
@@ -156,120 +176,34 @@ pub enum CommandType {
     // SetDataRateAndClockFrequency = 0x73,
 }
 
-macro_rules! command_message {
-
-    ($($Name:ident: $code:expr,)*) => {
-        $(
-            #[derive(Debug)]
-            pub struct $Name {
-                // use reference? pulls in lifetimes though...
-                ext_raw: ExtPacket,
-            }
-
-            impl core::ops::Deref for $Name {
-                type Target = ExtPacket;
-
-                #[inline]
-                fn deref(&self) -> &Self::Target {
-                    &self.ext_raw
-                }
-            }
-
-            impl core::ops::DerefMut for $Name {
-
-                #[inline]
-                fn deref_mut(&mut self) -> &mut Self::Target {
-                    &mut self.ext_raw
-                }
-            }
-
-            impl Packet for $Name {}
-        )*
-
-        pub enum Command {
-            $(
-                $Name($Name),
-            )*
+impl ExtPacket {
+    pub fn command_type(&self) -> Result<CommandKind, Error> {
+        if self.len() < CCID_HEADER_LEN {
+            return Err(Error::ShortPacket);
         }
-
-        impl Command {
-            pub fn seq(&self) -> u8 {
-                match self {
-                    $(
-                        Command::$Name(packet) => packet.seq(),
-                    )*
-                }
-            }
-
-            pub fn command_type(&self) -> CommandType {
-                match self {
-                    $(
-                        Command::$Name(_) => CommandType::$Name,
-                    )*
-                }
-            }
+        if self[5] != 0 {
+            // wrong slot
         }
-
-        impl core::convert::TryFrom<ExtPacket> for Command {
-            type Error = Error;
-
-            #[inline]
-            fn try_from(packet: ExtPacket)
-                -> core::result::Result<Self, Self::Error>
-            {
-                if packet.len() < CCID_HEADER_LEN {
-                    return Err(Error::ShortPacket);
-                }
-                if packet[5] != 0 {
-                    // wrong slot
-                }
-                let command_byte = packet[0];
-                Ok(match command_byte {
-                    $(
-                        $code => Command::$Name($Name { ext_raw: packet } ),
-                    )*
-                    _ => return Err(Error::UnknownCommand(command_byte)),
-                })
-            }
+        let command_byte = self[0];
+        match command_byte {
+            0x62 => Ok(CommandKind::PowerOn),
+            0x63 => Ok(CommandKind::PowerOff),
+            0x65 => Ok(CommandKind::GetSlotStatus),
+            0x6c => Ok(CommandKind::GetParameters),
+            0x6f => Ok(CommandKind::XfrBlock),
+            0x72 => Ok(CommandKind::Abort),
+            _ => Err(Error::UnknownCommand(command_byte)),
         }
-
-        impl core::ops::Deref for Command {
-            type Target = ExtPacket;
-
-            #[inline]
-            fn deref(&self) -> &Self::Target {
-                match self {
-                    $(
-                        Command::$Name(packet) => &packet,
-                    )*
-                }
-            }
-        }
-
-        // impl core::ops::DerefMut for Command {
-
-        //     #[inline]
-        //     fn deref_mut(&mut self) -> &mut Self::Target {
-        //         match self {
-        //             $(
-        //                 Command::$Name(packet) => &mut packet,
-        //             )*
-        //         }
-        //     }
-        // }
     }
 }
-
-command_message!(
-    PowerOn: 0x62,
-    PowerOff: 0x63,
-    GetSlotStatus: 0x65,
-    GetParameters: 0x6c,
-    XfrBlock: 0x6f,
-    Abort: 0x72,
-);
-
-impl PacketWithData for XfrBlock {}
+// command_message!(
+//     PowerOn: 0x62,
+//     PowerOff: 0x63,
+//     GetSlotStatus: 0x65,
+//     GetParameters: 0x6c,
+//     XfrBlock: 0x6f,
+//     Abort: 0x72,
+// );
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -290,19 +224,22 @@ impl Chain {
     }
 }
 
-impl core::fmt::Debug for Command {
+impl core::fmt::Debug for ExtPacket {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("Command");
         // write!("Command({:?})", &self.command_type()));
         // // "Command");
 
+        let Ok(command_type) = self.command_type() else {
+            return debug_struct.field("cmd", &format_args!("error")).field("value", &format_args!("{:02x?}", self.0)).finish();
+        };
         debug_struct
-            .field("cmd", &self.command_type())
+            .field("cmd", &command_type)
             .field("seq", &self.seq());
 
-        if let Command::XfrBlock(block) = self {
+        if command_type == CommandKind::XfrBlock {
             let l = core::cmp::min(self.len(), 8);
-            let escaped_bytes: heapless::Vec<u8, 64> = block
+            let escaped_bytes: heapless::Vec<u8, 64> = self
                 .data()
                 .iter()
                 .take(l)
@@ -311,8 +248,8 @@ impl core::fmt::Debug for Command {
             let data_as_str = &core::str::from_utf8(&escaped_bytes).unwrap();
 
             debug_struct
-                .field("chain", &block.chain())
-                .field("len", &block.data().len());
+                .field("chain", &self.chain())
+                .field("len", &self.data().len());
 
             if l < self.len() {
                 debug_struct.field("data[..8]", &format_args!("b'{data_as_str}'"))
