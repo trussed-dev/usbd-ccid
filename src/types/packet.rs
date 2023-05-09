@@ -177,7 +177,7 @@ pub enum CommandKind {
 }
 
 impl ExtPacket {
-    pub fn command_type(&self) -> Result<CommandKind, Error> {
+    pub fn command_kind(&self) -> Result<CommandKind, Error> {
         if self.len() < CCID_HEADER_LEN {
             return Err(Error::ShortPacket);
         }
@@ -230,7 +230,7 @@ impl core::fmt::Debug for ExtPacket {
         // write!("Command({:?})", &self.command_type()));
         // // "Command");
 
-        let Ok(command_type) = self.command_type() else {
+        let Ok(command_type) = self.command_kind() else {
             return debug_struct.field("cmd", &format_args!("error")).field("value", &format_args!("{:02x?}", self.0)).finish();
         };
         debug_struct

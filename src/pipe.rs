@@ -179,7 +179,7 @@ where
         // info!("{:X?}", &packet).ok();
         // let p = packet.clone();
         // match CommandKind::try_from(packet) {
-        match self.ext_packet.command_type() {
+        match self.ext_packet.command_kind() {
             Ok(command) => {
                 self.seq = self.ext_packet.seq();
 
