@@ -61,17 +61,20 @@ pub trait PacketWithData: Packet {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct UnknownChaining;
+
 pub trait ChainedPacket: Packet {
     #[inline(always)]
-    fn chain(&self) -> Chain {
+    fn chain(&self) -> Result<Chain, UnknownChaining> {
         let level_parameter = u16::from_le_bytes(self[8..10].try_into().unwrap());
         match level_parameter {
-            0 => Chain::BeginsAndEnds,
-            1 => Chain::Begins,
-            2 => Chain::Ends,
-            3 => Chain::Continues,
-            0x10 => Chain::ExpectingMore,
-            _ => panic!("invalid power select parameter"),
+            0 => Ok(Chain::BeginsAndEnds),
+            1 => Ok(Chain::Begins),
+            2 => Ok(Chain::Ends),
+            3 => Ok(Chain::Continues),
+            0x10 => Ok(Chain::ExpectingMore),
+            _ => Err(UnknownChaining),
         }
     }
 }

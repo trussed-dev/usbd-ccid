@@ -281,7 +281,7 @@ where
             State::Idle => {
                 // invariant: BUFFER_SIZE >= PACKET_SIZE
                 match command.chain() {
-                    Chain::BeginsAndEnds => {
+                    Ok(Chain::BeginsAndEnds) => {
                         info!("begins and ends");
                         self.reset_interchange();
                         let Some(message) = self.interchange.request_mut() else {
@@ -299,7 +299,7 @@ where
                         self.state = State::Processing;
                         // self.send_empty_datablock();
                     }
-                    Chain::Begins => {
+                    Ok(Chain::Begins) => {
                         info!("begins");
                         self.reset_interchange();
                         let Some(message) = self.interchange.request_mut() else {
@@ -316,6 +316,10 @@ where
                         self.state = State::Receiving;
                         self.send_empty_datablock(Chain::ExpectingMore);
                     }
+                    Err(_) => {
+                        error!("Unknown chain");
+                        self.reset_state();
+                    }
                     _ => {
                         error!("unexpectedly in idle state");
                         self.reset_state();
@@ -324,7 +328,7 @@ where
             }
 
             State::Receiving => match command.chain() {
-                Chain::Continues => {
+                Ok(Chain::Continues) => {
                     info!("continues");
                     let Some(message) = self.interchange.request_mut() else {
                         error!("Interchange is busy");
@@ -338,7 +342,7 @@ where
                     }
                     self.send_empty_datablock(Chain::ExpectingMore);
                 }
-                Chain::Ends => {
+                Ok(Chain::Ends) => {
                     info!("ends");
                     let Some(message) = self.interchange.request_mut() else {
                         error!("Interchange is busy");
@@ -352,6 +356,10 @@ where
                     }
                     self.call_app();
                     self.state = State::Processing;
+                }
+                Err(_) => {
+                    error!("Unknown chain");
+                    self.reset_state();
                 }
                 _ => {
                     error!("unexpectedly in receiving state");
@@ -368,7 +376,7 @@ where
             }
 
             State::Sending => match command.chain() {
-                Chain::ExpectingMore => {
+                Ok(Chain::ExpectingMore) => {
                     self.prime_outbox();
                 }
                 _chain => {
