@@ -95,6 +95,24 @@ where
         }
     }
 
+    /// Reset the state of the CCID driver
+    ///
+    /// This is done on unexpected input instead of panicking
+    fn reset_state(&mut self) {
+        self.seq = 0;
+        self.state = State::Idle;
+        self.sent = 0;
+        self.outbox = None;
+        self.packet_len = 0;
+        self.receiving_long = false;
+        self.long_packet_missing = 0;
+        self.in_chain = 0;
+        self.started_processing = false;
+        self.bulk_abort = None;
+        self.control_abort = None;
+        self.reset_interchange();
+    }
+
     fn construct_atr(card_issuers_data: Option<&[u8]>, signal_t_equals_0: bool) -> Vec<u8, 32> {
         assert!(card_issuers_data.map_or(true, |data| data.len() <= 13));
         let k = card_issuers_data.map_or(0u8, |data| 2 + data.len() as u8);
@@ -146,11 +164,15 @@ where
         // only (can we fix this), so 255B is the maximum)
         if !self.receiving_long {
             if packet.len() < CCID_HEADER_LEN {
-                panic!("unexpected short packet");
+                error!("unexpected short packet");
+                self.reset_state();
+                return;
             }
             self.ext_packet.clear();
             // TODO check
-            self.ext_packet.extend_from_slice(&packet).unwrap();
+            self.ext_packet
+                .extend_from_slice(&packet)
+                .expect("Raw packets are not larger than ext packets");
 
             let pl = packet.data_len();
             if pl > PACKET_SIZE - CCID_HEADER_LEN {
@@ -159,22 +181,32 @@ where
                 self.long_packet_missing = pl - (PACKET_SIZE - CCID_HEADER_LEN);
                 self.packet_len = pl;
                 return;
-            } else {
-                // normal case
             }
         } else {
             // TODO check
-            self.ext_packet.extend_from_slice(&packet).ok();
-            self.in_chain += 1;
-            assert!(packet.len() <= self.long_packet_missing);
-            self.long_packet_missing -= packet.len();
-            if self.long_packet_missing > 0 {
+            if self.ext_packet.extend_from_slice(&packet).is_err() {
+                error!(
+                    "Extended packet got larger than maximum size ({}), wants {}",
+                    self.ext_packet.capacity(),
+                    self.ext_packet.len() + packet.len(),
+                );
+                self.reset_state();
                 return;
-            } else {
-                // info!("pl {}, p {}, missing {}, in_chain {}", self.packet_len, packet.len(), self.long_packet_missing, self.in_chain).ok();
-                // info!("packet: {:X?}", &self.ext_packet).ok();
-                self.receiving_long = false;
             }
+            self.in_chain += 1;
+            if packet.len() > self.long_packet_missing {
+                error!("Got larger packet than expected");
+                self.long_packet_missing = 0;
+            } else {
+                self.long_packet_missing -= packet.len();
+            }
+            if self.long_packet_missing != 0 {
+                return;
+            }
+
+            // info!("pl {}, p {}, missing {}, in_chain {}", self.packet_len, packet.len(), self.long_packet_missing, self.in_chain).ok();
+            // info!("packet: {:X?}", &self.ext_packet).ok();
+            self.receiving_long = false;
         }
 
         // info!("{:X?}", &packet).ok();
@@ -213,7 +245,8 @@ where
             }
 
             Err(PacketError::ShortPacket) => {
-                panic!("short packet!");
+                error!("Unexpectedly short packet");
+                self.reset_state();
             }
 
             Err(PacketError::UnknownCommand(_p)) => {
@@ -227,13 +260,14 @@ where
     #[inline(never)]
     fn reset_interchange(&mut self) {
         let message = Vec::new();
-        self.interchange.take_response();
         // this may no longer be needed
         // before the interchange change (adding the request_mut method),
         // one necessary side-effect of this was to set the interchange's
         // enum variant to Request.
         self.interchange.request(&message).ok();
         self.interchange.cancel().ok();
+
+        self.interchange.take_response();
     }
 
     fn handle_transfer(&mut self, command: XfrBlock) {
@@ -250,9 +284,17 @@ where
                     Chain::BeginsAndEnds => {
                         info!("begins and ends");
                         self.reset_interchange();
-                        let message = self.interchange.request_mut().unwrap();
+                        let Some(message) = self.interchange.request_mut() else {
+                            error!("Interchange is busy");
+                            self.reset_state();
+                            return;
+                        };
                         message.clear();
-                        message.extend_from_slice(command.data()).unwrap();
+                        if message.extend_from_slice(command.data()).is_err() {
+                            error!("Interchange is full");
+                            self.reset_state();
+                            return;
+                        };
                         self.call_app();
                         self.state = State::Processing;
                         // self.send_empty_datablock();
@@ -260,53 +302,82 @@ where
                     Chain::Begins => {
                         info!("begins");
                         self.reset_interchange();
-                        let message = self.interchange.request_mut().unwrap();
+                        let Some(message) = self.interchange.request_mut() else {
+                            error!("Interchange is busy");
+                            self.reset_state();
+                            return;
+                        };
                         message.clear();
-                        message.extend_from_slice(command.data()).unwrap();
+                        if message.extend_from_slice(command.data()).is_err() {
+                            error!("Interchange is full");
+                            self.reset_state();
+                            return;
+                        };
                         self.state = State::Receiving;
                         self.send_empty_datablock(Chain::ExpectingMore);
                     }
-                    _ => panic!("unexpectedly in idle state"),
+                    _ => {
+                        error!("unexpectedly in idle state");
+                        self.reset_state();
+                    }
                 }
             }
 
             State::Receiving => match command.chain() {
                 Chain::Continues => {
                     info!("continues");
-                    let message = self.interchange.request_mut().unwrap();
-                    assert!(command.data().len() + message.len() <= MAX_MSG_LENGTH);
-                    message.extend_from_slice(command.data()).unwrap();
+                    let Some(message) = self.interchange.request_mut() else {
+                        error!("Interchange is busy");
+                        self.reset_state();
+                        return;
+                    };
+                    if message.extend_from_slice(command.data()).is_err() {
+                        error!("Receiving unexpectedly large data");
+                        self.reset_state();
+                        return;
+                    }
                     self.send_empty_datablock(Chain::ExpectingMore);
                 }
                 Chain::Ends => {
                     info!("ends");
-                    let message = self.interchange.request_mut().unwrap();
-                    assert!(command.data().len() + message.len() <= MAX_MSG_LENGTH);
-                    message.extend_from_slice(command.data()).unwrap();
+                    let Some(message) = self.interchange.request_mut() else {
+                        error!("Interchange is busy");
+                        self.reset_state();
+                        return;
+                    };
+                    if message.extend_from_slice(command.data()).is_err() {
+                        error!("Receiving unexpectedly large data");
+                        self.reset_state();
+                        return;
+                    }
                     self.call_app();
                     self.state = State::Processing;
                 }
-                _ => panic!("unexpectedly in receiving state"),
+                _ => {
+                    error!("unexpectedly in receiving state");
+                    self.reset_state();
+                }
             },
 
-            State::Processing => {
-                // info!("handle xfrblock").ok();
-                // info!("{:X?}", &command).ok();
-                panic!(
-                    "ccid pipe unexpectedly received command while in processing state: {:?}",
-                    &command
+            State::Processing | State::ReadyToSend => {
+                error!(
+                    "ccid pipe unexpectedly received command {:?} while in state: {:?}",
+                    &command, self.state,
                 );
-            }
-
-            State::ReadyToSend => {
-                panic!("unexpectedly in ready-to-send state")
+                self.reset_state();
             }
 
             State::Sending => match command.chain() {
                 Chain::ExpectingMore => {
                     self.prime_outbox();
                 }
-                _ => panic!("unexpectedly in receiving state"),
+                _chain => {
+                    error!(
+                        "unexpectedly in receiving state and got chain: {:?}",
+                        _chain
+                    );
+                    self.reset_state();
+                }
             },
         }
     }
@@ -373,11 +444,15 @@ where
         }
 
         if self.outbox.is_some() {
-            panic!("Full outbox");
+            error!("Full outbox");
+            self.reset_state();
+            return;
         }
 
         let Some(message) = self.interchange.response()  else {
-            panic!("No response while priming outbox");
+            error!("Got no response while priming outbox");
+            self.reset_state();
+            return;
         };
 
         let chunk_size = core::cmp::min(PACKET_SIZE - CCID_HEADER_LEN, message.len() - self.sent);
@@ -506,7 +581,10 @@ where
                         self.outbox = None;
                     }
                 }
-                Ok(_) => panic!("short write"),
+                Ok(_sent) => {
+                    error!("Failed to send entire packet, sent only {}", _sent);
+                    self.reset_state()
+                }
 
                 Err(UsbError::WouldBlock) => {
                     // fine, can't write try later
@@ -514,7 +592,10 @@ where
                     info!("waiting to send");
                 }
 
-                Err(_) => panic!("unexpected send error"),
+                Err(_err) => {
+                    error!("Failed to send packet {}", _err);
+                    self.reset_state()
+                }
             }
         }
     }
