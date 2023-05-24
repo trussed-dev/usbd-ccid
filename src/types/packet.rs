@@ -7,11 +7,27 @@ pub type ExtPacket = heapless::Vec<u8, MAX_MSG_LENGTH>;
 
 pub trait RawPacketExt {
     fn data_len(&self) -> usize;
+    fn zeroed() -> Self;
+    fn zeroed_until(len: usize) -> Self;
 }
 
 impl RawPacketExt for RawPacket {
     fn data_len(&self) -> usize {
         u32::from_le_bytes(self[1..5].try_into().unwrap()) as usize
+    }
+
+    fn zeroed() -> Self {
+        let mut res = Self::new();
+        let cap = res.capacity();
+        res.resize_default(cap).unwrap();
+        res
+    }
+
+    fn zeroed_until(len: usize) -> Self {
+        let mut res = Self::new();
+        let cap = res.capacity();
+        res.resize_default(len.min(cap)).unwrap();
+        res
     }
 }
 
@@ -109,9 +125,8 @@ impl core::fmt::Debug for DataBlock<'_> {
 
 impl From<DataBlock<'_>> for RawPacket {
     fn from(block: DataBlock<'_>) -> RawPacket {
-        let mut packet = RawPacket::new();
         let len = block.data.len();
-        packet.resize_default(CCID_HEADER_LEN + len).ok();
+        let mut packet = RawPacket::zeroed_until(CCID_HEADER_LEN + len);
         packet[0] = 0x80;
         packet[1..][..4].copy_from_slice(
             &u32::try_from(len)
