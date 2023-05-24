@@ -99,9 +99,9 @@ where
             Some(self.string_index),
         )?;
         writer.write(FUNCTIONAL_INTERFACE, &FUNCTIONAL_INTERFACE_DESCRIPTOR)?;
-        writer.endpoint(&self.pipe.write).unwrap();
-        writer.endpoint(&self.read).unwrap();
-        // writer.endpoint(&self.interrupt).unwrap();
+        writer.endpoint(&self.pipe.write).ok();
+        writer.endpoint(&self.read).ok();
+        // writer.endpoint(&self.interrupt).ok();
         Ok(())
     }
 
@@ -179,7 +179,10 @@ where
                         ClassRequest::GetDataRates => {
                             transfer.accept_with_static(&DATA_RATE_BPS).ok();
                         }
-                        _ => panic!("unexpected direction for {:?}", &request),
+                        _ => {
+                            error!("unexpected direction for {:?}", &request);
+                            self.pipe.reset_state();
+                        }
                     }
                 }
 
@@ -219,7 +222,10 @@ where
                             // transfer.reject().ok();
                             // todo!();
                         }
-                        _ => panic!("unexpected direction for {:?}", &request),
+                        _ => {
+                            error!("unexpected direction for {:?}", &request);
+                            self.pipe.reset_state();
+                        }
                     }
                 }
 
