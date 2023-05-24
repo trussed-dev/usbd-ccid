@@ -98,7 +98,7 @@ where
     /// Reset the state of the CCID driver
     ///
     /// This is done on unexpected input instead of panicking
-    fn reset_state(&mut self) {
+    pub fn reset_state(&mut self) {
         self.seq = 0;
         self.state = State::Idle;
         self.sent = 0;
