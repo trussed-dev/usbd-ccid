@@ -6,7 +6,7 @@ use crate::{
     constants::*,
     types::packet::{
         Chain, ChainedPacket as _, Command as PacketCommand, DataBlock, Error as PacketError,
-        ExtPacket, PacketWithData as _, RawPacket, XfrBlock,
+        ExtPacket, PacketWithData as _, RawPacket, RawPacketExt as _, XfrBlock,
     },
 };
 
@@ -385,8 +385,7 @@ where
     pub fn send_wait_extension(&mut self) -> bool {
         if self.state == State::Processing {
             // Need to send a wait extension request.
-            let mut packet = RawPacket::new();
-            packet.resize_default(CCID_HEADER_LEN).ok();
+            let mut packet = RawPacket::zeroed_until(CCID_HEADER_LEN);
             packet[0] = 0x80;
             packet[6] = self.seq;
 
@@ -494,16 +493,14 @@ where
     }
 
     fn send_slot_status_ok(&mut self) {
-        let mut packet = RawPacket::new();
-        packet.resize_default(CCID_HEADER_LEN).ok();
+        let mut packet = RawPacket::zeroed_until(CCID_HEADER_LEN);
         packet[0] = 0x81;
         packet[6] = self.seq;
         self.send_packet_assuming_possible(packet);
     }
 
     fn send_slot_status_error(&mut self, error: Error) {
-        let mut packet = RawPacket::new();
-        packet.resize_default(CCID_HEADER_LEN).ok();
+        let mut packet = RawPacket::zeroed_until(CCID_HEADER_LEN);
         packet[0] = 0x6c;
         packet[6] = self.seq;
         packet[7] = 1 << 6;
@@ -512,8 +509,7 @@ where
     }
 
     fn send_parameters(&mut self) {
-        let mut packet = RawPacket::new();
-        packet.resize_default(17).ok();
+        let mut packet = RawPacket::zeroed_until(17);
         packet[0] = 0x82;
         packet[1] = 7;
         packet[6] = self.seq;
