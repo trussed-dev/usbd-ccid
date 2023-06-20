@@ -591,7 +591,7 @@ where
                 }
 
                 Err(_err) => {
-                    error!("Failed to send packet {}", _err);
+                    error!("Failed to send packet {:?}", _err);
                     self.reset_state()
                 }
             }
