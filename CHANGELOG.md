@@ -6,10 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0]
+
 - Migrate to Interchange `0.3.0` ([#10][])
- - This adds a `'pipe` lifetime to the `Ccid` structure
-  Similar behaviour to the before this fix can be emulated using two `const` [`Channels`](https://docs.rs/interchange/latest/interchange/struct.Channel.html)
-  and using a `'static` lifetime
+  - This adds a `'pipe` lifetime to the `Ccid` structure
+    Similar behaviour to the before this fix can be emulated using two `const` [`Channels`](https://docs.rs/interchange/latest/interchange/struct.Channel.html)
+    and using a `'static` lifetime
+- Reset state instead of panicking ([#13][])
+
+[#10]: https://github.com/trussed-dev/usbd-ccid/pull/10
+[#13]: https://github.com/trussed-dev/usbd-ccid/pull/13
 
 ## [0.2.0] 2023-02-06
 
@@ -47,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] 2023-24-01
 
-[Unreleased]: https://github.com/trussed-dev/usbd-ccid/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/trussed-dev/usbd-ccid/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/trussed-dev/usbd-ccid/releases/tag/0.3.0
 [0.2.0]: https://github.com/trussed-dev/usbd-ccid/releases/tag/0.2.0
 [0.1.0]: https://github.com/trussed-dev/usbd-ccid/releases/tag/0.1.0
