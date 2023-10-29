@@ -450,7 +450,7 @@ where
             return;
         }
 
-        let Ok(message) = self.interchange.response()  else {
+        let Ok(message) = self.interchange.response() else {
             error!("Got no response while priming outbox");
             self.reset_state();
             return;
