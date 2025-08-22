@@ -7,20 +7,12 @@ pub type ExtPacket = heapless::Vec<u8, MAX_MSG_LENGTH>;
 
 pub trait RawPacketExt {
     fn data_len(&self) -> usize;
-    fn zeroed() -> Self;
     fn zeroed_until(len: usize) -> Self;
 }
 
 impl RawPacketExt for RawPacket {
     fn data_len(&self) -> usize {
         u32::from_le_bytes(self[1..5].try_into().unwrap()) as usize
-    }
-
-    fn zeroed() -> Self {
-        let mut res = Self::new();
-        let cap = res.capacity();
-        res.resize_default(cap).unwrap();
-        res
     }
 
     fn zeroed_until(len: usize) -> Self {
@@ -36,13 +28,13 @@ pub enum Error {
     UnknownCommand(u8),
 }
 
-pub trait Packet: core::ops::Deref<Target = ExtPacket> {
-    #[inline]
-    fn slot(&self) -> u8 {
-        // we have only one slot
-        assert!(self[5] == 0);
-        self[5]
-    }
+pub trait Packet: core::ops::Deref<Target = heapless::VecView<u8>> {
+    // #[inline]
+    // fn slot(&self) -> u8 {
+    //     // we have only one slot
+    //     assert!(self[5] == 0);
+    //     self[5]
+    // }
 
     #[inline]
     fn seq(&self) -> u8 {
