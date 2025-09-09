@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Update `heapless` to v0.9
+
 ## [0.3.0]
 
 - Migrate to Interchange `0.3.0` ([#10][])

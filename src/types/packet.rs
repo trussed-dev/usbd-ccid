@@ -29,13 +29,6 @@ pub enum Error {
 }
 
 pub trait Packet: core::ops::Deref<Target = heapless::VecView<u8>> {
-    // #[inline]
-    // fn slot(&self) -> u8 {
-    //     // we have only one slot
-    //     assert!(self[5] == 0);
-    //     self[5]
-    // }
-
     #[inline]
     fn seq(&self) -> u8 {
         self[6]
@@ -177,7 +170,7 @@ macro_rules! command_message {
             }
 
             impl core::ops::Deref for $Name {
-                type Target = ExtPacket;
+                type Target = heapless::VecView<u8>;
 
                 #[inline]
                 fn deref(&self) -> &Self::Target {
@@ -244,7 +237,7 @@ macro_rules! command_message {
         }
 
         impl core::ops::Deref for Command {
-            type Target = ExtPacket;
+            type Target = heapless::VecView<u8>;
 
             #[inline]
             fn deref(&self) -> &Self::Target {

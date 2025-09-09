@@ -35,7 +35,7 @@ enum Error {
 }
 
 pub(crate) type Requester<'pipe, const N: usize> =
-    interchange::Requester<'pipe, iso7816::Data<N>, iso7816::Data<N>>;
+    interchange::Requester<'pipe, heapless::Vec<u8, N>, heapless::Vec<u8, N>>;
 
 pub struct Pipe<'bus, 'pipe, Bus, const N: usize>
 where
@@ -114,7 +114,7 @@ where
     }
 
     fn construct_atr(card_issuers_data: Option<&[u8]>, signal_t_equals_0: bool) -> Vec<u8, 32> {
-        assert!(card_issuers_data.map_or(true, |data| data.len() <= 13));
+        assert!(card_issuers_data.is_none_or(|data| data.len() <= 13));
         let k = card_issuers_data.map_or(0u8, |data| 2 + data.len() as u8);
         let mut atr = Vec::new();
         // TS: direct convention
