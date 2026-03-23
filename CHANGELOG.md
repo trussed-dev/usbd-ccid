@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+-
+
+## [0.4.0]
+
 - Update `heapless` to v0.9
 
 ## [0.3.0]
@@ -55,7 +59,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] 2023-24-01
 
-[Unreleased]: https://github.com/trussed-dev/usbd-ccid/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/trussed-dev/usbd-ccid/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/trussed-dev/usbd-ccid/releases/tag/0.4.0
 [0.3.0]: https://github.com/trussed-dev/usbd-ccid/releases/tag/0.3.0
 [0.2.0]: https://github.com/trussed-dev/usbd-ccid/releases/tag/0.2.0
 [0.1.0]: https://github.com/trussed-dev/usbd-ccid/releases/tag/0.1.0
