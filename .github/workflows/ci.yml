@@ -1,0 +1,22 @@
+name: ci
+
+on: [pull_request, push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - name: install Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: check
+        run: |
+          cargo check --workspace --all-features --all-targets
+      - name: test
+        run: |
+          cargo test --all-features --workspace
+      - name: lint
+        run: |
+          cargo fmt --check --all
+          cargo clippy --workspace --all-features --all-targets -- -Dwarnings
+          RUSTDOCFLAGS='-Dwarnings' cargo doc --workspace --all-features --no-deps
