@@ -101,7 +101,7 @@ where
         Ok(())
     }
 
-    fn get_string(&self, index: StringIndex, _lang_id: u16) -> Option<&str> {
+    fn get_string(&self, index: StringIndex, _lang_id: LangID) -> Option<&str> {
         (self.string_index == index).then_some(FUNCTIONAL_INTERFACE_STRING)
     }
 

@@ -15,7 +15,7 @@ embedded-time = "0.12"
 heapless = "0.9"
 # heapless-bytes = "0.3"
 interchange = "0.3"
-usb-device = { version = "0.2.3", features = ["control-buffer-256"] }
+usb-device = { version = "0.3.2", features = ["control-buffer-256"] }
 
 [features]
 default = []
