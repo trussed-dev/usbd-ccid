@@ -632,6 +632,7 @@ where
         self.started_processing = false;
         self.receiving_long = false;
         self.long_packet_missing = 0;
+        self.interchange.cancel().ok();
 
         // send response for successful abort
         self.send_slot_status_ok();
